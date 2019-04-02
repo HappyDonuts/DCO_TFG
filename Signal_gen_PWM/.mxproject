@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=D:/Users/Javi/git/STM32_F303K8/DAC_DMA_Timer/Inc
+HeaderPath=C:/Users/Javi/GitHub/DCO_TFG/Signal_gen_PWM/Inc
 HeaderFiles=stm32f3xx_it.h;stm32f3xx_hal_conf.h;main.h;
-SourcePath=D:/Users/Javi/git/STM32_F303K8/DAC_DMA_Timer/Src
+SourcePath=C:/Users/Javi/GitHub/DCO_TFG/Signal_gen_PWM/Src
 SourceFiles=stm32f3xx_it.c;stm32f3xx_hal_msp.c;main.c;
 
 [PreviousLibFiles]

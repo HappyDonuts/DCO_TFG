@@ -64,10 +64,12 @@
 /* Private variables ---------------------------------------------------------*/
 TIM_HandleTypeDef htim3;
 
+UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 static uint16_t timers_notas[89];
+uint8_t mensaje_MIDI[3];
 
 /* USER CODE END PV */
 
@@ -76,10 +78,14 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-void calculo_signal(uint8_t duty_cycle);
+void calculo_notas(void);
 void start_nota(uint8_t nota);
+void stop_nota(void);
 void tx_UART_int(UART_HandleTypeDef *huart, int data, uint32_t Timeout);
+void tx_byte(UART_HandleTypeDef *huart, uint8_t data, uint32_t Timeout);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -117,11 +123,12 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_TIM3_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-  calculo_signal(50);
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+  calculo_notas();
+  //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 
-  start_nota(88);
+  //start_nota(88);
 
   /* USER CODE END 2 */
 
@@ -144,6 +151,7 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
 
   /**Initializes the CPU, AHB and APB busses clocks 
   */
@@ -167,6 +175,12 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+  PeriphClkInit.Usart1ClockSelection = RCC_USART1CLKSOURCE_PCLK1;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
@@ -232,6 +246,41 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 31250;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -293,7 +342,8 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void calculo_signal(uint8_t duty_cycle){
+// Calcula todas las notas (1-88) y sus respectivos periodos para el timer
+void calculo_notas(void){
 	for (uint8_t i=1;i<89;i++){
 		float f_nota = 27.50 * pow(1.059463094, i-1);
 		timers_notas[i] = round(F_CLK/320/f_nota);
@@ -301,9 +351,31 @@ void calculo_signal(uint8_t duty_cycle){
 }
 
 void start_nota(uint8_t nota){
+	__HAL_TIM_SET_AUTORELOAD(&htim3, timers_notas[nota]-1); // Ajustamos el timer adecuado
+	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period - (timers_notas[nota]-1)/2); //Ajustamos el duty cycle a 1/2, se controlará externamente con un ADC
+	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
+}
 
-	__HAL_TIM_SET_AUTORELOAD(&htim3, timers_notas[nota]-1);
-	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, htim3.Init.Period - (timers_notas[nota]-1)/2);
+void stop_nota(void) {
+	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_1);
+}
+
+// Atencion a la interrupción de la UART1, cuando se recibe un mensaje MIDI salta la interrupcion
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+
+	// Trasmitimos los bytes recibidos por la UART2, por pantalla
+	for(uint8_t i=0;i<sizeof(mensaje_MIDI);i++){
+		tx_byte(&huart2, mensaje_MIDI[i], 10);
+	}
+	// Analizamos el primer byte recibido. Si empieza por 1001, start nota
+	if ((mensaje_MIDI[0]>>4) == 0b1001){
+		uint8_t nota = mensaje_MIDI[1]-20; // Obtenemos la nota MIDI, le restamos 20 para que coincida con nuestro teclado
+		start_nota(nota);
+	}
+	else {	// Si no empieza por 1001, es un stop nota
+		stop_nota();
+	}
+	__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE); // Volvemos a activar las interrupciones de la UART1
 
 }
 
@@ -341,6 +413,23 @@ void tx_UART_int(UART_HandleTypeDef *huart, int data, uint32_t Timeout)
 	HAL_UART_Transmit(huart,data_tx,sizeof(data_tx), 10);	// TX por UART del array de uint8_t
 	uint8_t salto[] = "\r\n";
 	HAL_UART_Transmit(huart, salto, 2, 10);
+}
+
+void tx_byte(UART_HandleTypeDef *huart, uint8_t data, uint32_t Timeout){
+
+	uint8_t byte[8];
+	for(uint8_t i=0;i<8;i++){
+		if((data>>(7-i) & 0x01)==1){
+			byte[i]=0x31;
+		}
+		if((data>>(7-i) & 0x01)==0){
+			byte[i]=0x30;
+		}
+	}
+HAL_UART_Transmit(huart, byte, sizeof(byte), 10);
+
+uint8_t salto[] = "\r\n";
+HAL_UART_Transmit(huart, salto, 2, 10);
 }
 /* USER CODE END 4 */
 
