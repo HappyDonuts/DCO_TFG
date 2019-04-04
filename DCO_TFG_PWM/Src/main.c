@@ -128,7 +128,7 @@ int main(void)
   calculo_notas();
   //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 
-  //start_nota(88);
+  start_nota(1);
 
   /* USER CODE END 2 */
 
