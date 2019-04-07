@@ -72,6 +72,8 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 static uint16_t timers_notas[89];
 uint8_t mensaje_MIDI[3];
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -130,7 +132,7 @@ int main(void)
 
    for(uint8_t i=1; i<89;i++){
    start_nota(i);
-   HAL_Delay(200);
+   HAL_Delay(800);
    }
   /* USER CODE END 2 */
 
@@ -419,6 +421,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE); // Volvemos a activar las interrupciones de la UART1
 
 }
+
+
 /* USER CODE END 4 */
 
 /**
