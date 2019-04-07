@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=D:/Users/Javi/GitHub/STM32_F103C8/DCO_TFG_PWM_bp/Inc
+HeaderPath=D:/Users/Javi/GitHub/DCO_TFG/DCO_TFG_PWM_bp/Inc
 HeaderFiles=stm32f1xx_it.h;stm32f1xx_hal_conf.h;main.h;
-SourcePath=D:/Users/Javi/GitHub/STM32_F103C8/DCO_TFG_PWM_bp/Src
+SourcePath=D:/Users/Javi/GitHub/DCO_TFG/DCO_TFG_PWM_bp/Src
 SourceFiles=stm32f1xx_it.c;stm32f1xx_hal_msp.c;main.c;
 
 [PreviousLibFiles]

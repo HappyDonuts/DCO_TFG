@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=C:/Users/Javi/GitHub/DCO_TFG/Signal_gen_PWM/Inc
+HeaderPath=D:/Users/Javi/GitHub/DCO_TFG/DCO_TFG_PWM/Inc
 HeaderFiles=stm32f3xx_it.h;stm32f3xx_hal_conf.h;main.h;
-SourcePath=C:/Users/Javi/GitHub/DCO_TFG/Signal_gen_PWM/Src
+SourcePath=D:/Users/Javi/GitHub/DCO_TFG/DCO_TFG_PWM/Src
 SourceFiles=stm32f3xx_it.c;stm32f3xx_hal_msp.c;main.c;
 
 [PreviousLibFiles]
