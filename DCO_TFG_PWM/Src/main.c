@@ -44,6 +44,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "math.h"
+#include "print_UART.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,9 +84,6 @@ static void MX_USART1_UART_Init(void);
 void calculo_notas(void);
 void start_nota(uint8_t nota);
 void stop_nota(void);
-void tx_UART_int(UART_HandleTypeDef *huart, int data, uint32_t Timeout);
-void tx_byte(UART_HandleTypeDef *huart, uint8_t data, uint32_t Timeout);
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -129,7 +127,7 @@ int main(void)
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   //HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 
-  //start_nota(1);
+  start_nota(88);
 
   /* USER CODE END 2 */
 
@@ -366,7 +364,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 	// Trasmitimos los bytes recibidos por la UART2, por pantalla
 	for(uint8_t i=0;i<sizeof(mensaje_MIDI);i++){
-		tx_byte(&huart2, mensaje_MIDI[i], 10);
+		tx_UART_byte(&huart2, mensaje_MIDI[i], 10);
 	}
 	// Analizamos el primer byte recibido. Si empieza por 1001, start nota
 	if ((mensaje_MIDI[0]>>4) == 0b1001){
@@ -378,59 +376,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	}
 	__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE); // Volvemos a activar las interrupciones de la UART1
 
-}
-
-void tx_UART_int(UART_HandleTypeDef *huart, int data, uint32_t Timeout)
-{
-
-	int size = 1;
-	uint8_t negativo = 0;
-
-	if (data < 0) {	// Si los pulsos
-		data = -data;
-		negativo = 1;
-	}
-
-	int numero = data;
-
-	while(numero > 9) {
-	  numero =  numero/10;
-	  size++;
-	}
-
-	char data_char[size];		// String de chars
-	uint8_t data_tx[size];	// String de uint8_t
-
-	sprintf(data_char,"%d", data);	// Cada numero del int en un char
-
-	for(uint8_t i=0; i<size; i++ ) {			// Casting de char a uint8_t
-		data_tx[i] = (uint8_t) data_char[i];
-	}
-
-	if (negativo) {		// Si el numero es negativo, transmite un "-" antes
-		uint8_t menos[] = "-";
-		HAL_UART_Transmit(huart, menos, 1, 10);
-	}
-	HAL_UART_Transmit(huart,data_tx,sizeof(data_tx), 10);	// TX por UART del array de uint8_t
-	uint8_t salto[] = "\r\n";
-	HAL_UART_Transmit(huart, salto, 2, 10);
-}
-
-void tx_byte(UART_HandleTypeDef *huart, uint8_t data, uint32_t Timeout){
-
-	uint8_t byte[8];
-	for(uint8_t i=0;i<8;i++){
-		if((data>>(7-i) & 0x01)==1){
-			byte[i]=0x31;
-		}
-		if((data>>(7-i) & 0x01)==0){
-			byte[i]=0x30;
-		}
-	}
-HAL_UART_Transmit(huart, byte, sizeof(byte), 10);
-
-uint8_t salto[] = "\r\n";
-HAL_UART_Transmit(huart, salto, 2, 10);
 }
 /* USER CODE END 4 */
 
