@@ -381,6 +381,7 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+// Calcula las frecuencias de todas las notas y sus periodos del timer
 void calculo_notas(void){
 	for (uint8_t i=1;i<89;i++){
 		float f_nota = 27.50 * pow(1.059463094, i-1);
@@ -388,6 +389,7 @@ void calculo_notas(void){
 	}
 }
 
+// Crea la PWM correspondiente a la nota
 void start_nota(uint8_t nota){
 	__HAL_TIM_SET_AUTORELOAD(&htim2, timers_notas[nota]-1); // Ajustamos el timer adecuado
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period - (timers_notas[nota]-1)/2); //Ajustamos el duty cycle a 1/2, se controlará externamente con un ADC
