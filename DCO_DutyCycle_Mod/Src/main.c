@@ -359,10 +359,10 @@ uint16_t check_ADC(void){
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim==&htim3){
 		float data_adc = check_ADC();
-		float duty_cycle = 199*(0.5 - (data_adc-2048)/(8*4095));
+		float duty_cycle = 199*(0.5 - (data_adc-2048)/(16*4095));
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty_cycle);
 		float periodo_mod = 199*(1 + (data_adc)*0.25/4085); // En vez de 199 poner el periodo de la nota
-		__HAL_TIM_SET_AUTORELOAD(&htim2, periodo_mod);
+		//__HAL_TIM_SET_AUTORELOAD(&htim2, periodo_mod);
 	}
 }
 /* USER CODE END 4 */
