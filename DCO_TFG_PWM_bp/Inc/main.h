@@ -80,6 +80,12 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define PWM_Deltas_Pin GPIO_PIN_7
+#define PWM_Deltas_GPIO_Port GPIOA
+#define MOSFET_Offset_Pin GPIO_PIN_11
+#define MOSFET_Offset_GPIO_Port GPIOB
+#define PWM_cuadrada_Pin GPIO_PIN_15
+#define PWM_cuadrada_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

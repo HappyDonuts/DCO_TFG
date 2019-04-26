@@ -135,14 +135,17 @@ int main(void)
 //   start_nota(i);
 //   HAL_Delay(800);
 //   }
-//  start_nota(40);
+  start_nota(30);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
+	  start_nota(30);
+	  HAL_Delay(800);
+	  stop_nota();
+	  HAL_Delay(800);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -382,9 +385,13 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(MOSFET_Offset_GPIO_Port, MOSFET_Offset_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -392,6 +399,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MOSFET_Offset_Pin */
+  GPIO_InitStruct.Pin = MOSFET_Offset_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(MOSFET_Offset_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -406,6 +420,8 @@ void calculo_notas(void){
 
 // Crea la PWM correspondiente a la nota
 void start_nota(uint8_t nota){
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 0); // Cortamos el MOSFET para que el offset sea Voff, se resta el offset a la salida
+
 	__HAL_TIM_SET_AUTORELOAD(&htim2, timers_notas[nota]-1); // Ajustamos el timer adecuado
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period - (timers_notas[nota]-1)/2); //Ajustamos el duty cycle a 1/2, se controlará externamente con un ADC
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
@@ -416,6 +432,7 @@ void start_nota(uint8_t nota){
 }
 
 void stop_nota(void) {
+	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1); // Activamos el MOSFET para que el offset sea 0V, la salida sale a 0V
 	HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
 }
