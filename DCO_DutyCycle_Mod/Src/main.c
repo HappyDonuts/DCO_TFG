@@ -68,7 +68,8 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 /* USER CODE BEGIN PV */
-
+float intensity_dc = 20;
+float intensity_freq = 25;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -122,13 +123,6 @@ int main(void)
 
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
 	HAL_ADCEx_Calibration_Start(&hadc1);
-//	for (int i=1; i<199;i++){
-//		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, htim2.Init.Period - i);
-//		HAL_Delay(50);
-//
-//	}
-
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -159,7 +153,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL14;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL16;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -178,7 +172,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
-  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV4;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -358,11 +352,13 @@ uint16_t check_ADC(void){
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if(htim==&htim3){
+
 		float data_adc = check_ADC();
-		float duty_cycle = 199*(0.5 - (data_adc-2048)/(16*4095));
+		float periodo_mod = 200*(1 - (intensity_freq/500)*(data_adc-2048)/2048);
+		float duty_cycle = periodo_mod*(0.5 + (intensity_dc/100)*(data_adc-2048)/4095);
+
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty_cycle);
-		float periodo_mod = 199*(1 + (data_adc)*0.25/4085); // En vez de 199 poner el periodo de la nota
-		//__HAL_TIM_SET_AUTORELOAD(&htim2, periodo_mod);
+		__HAL_TIM_SET_AUTORELOAD(&htim2, periodo_mod);
 	}
 }
 /* USER CODE END 4 */
