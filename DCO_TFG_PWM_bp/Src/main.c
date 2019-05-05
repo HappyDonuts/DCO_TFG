@@ -143,9 +143,12 @@ int main(void)
   MX_ADC1_Init();
   MX_ADC2_Init();
   /* USER CODE BEGIN 2 */
+
+  // Calibrado de los ADC
   HAL_ADCEx_Calibration_Start(&hadc1);
+  HAL_ADCEx_Calibration_Start(&hadc2);
+
   calculo_notas();
-  HAL_TIM_Base_Start_IT(&htim4); // Timer del modulador
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
 
 //   for(uint8_t i=1; i<89;i++){
@@ -590,12 +593,15 @@ void start_nota(uint8_t nota){
 	__HAL_TIM_SET_AUTORELOAD(&htim3, timers_notas[nota]-1); // Ajustamos el timer adecuado
 	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, (timers_notas[nota]-1)/20); //Ajustamos el duty cycle a 1/20 (5%)
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
+
+	HAL_TIM_Base_Start_IT(&htim4); // Arrancamos timer del modulador
 }
 
 void stop_nota(void) {
 	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_11, 1); // Activamos el MOSFET para que el offset sea 0V, la salida sale a 0V
 	HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Stop(&htim3, TIM_CHANNEL_2);
+	HAL_TIM_Base_Stop_IT(&htim4); // Paramos timer del modulador
 }
 
 // Atencion a la interrupción de la UART1, cuando se recibe un mensaje MIDI salta la interrupcion
@@ -625,8 +631,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 		float periodo_mod = (timers_notas[nota_actual]-1)*(1 - (intensity_freq/500)*(data_adc_freq-2048)/2048);
 		float duty_cycle_mod = periodo_mod*(0.5 + (intensity_dc/100)*(data_adc_dc-2048)/4095);
 
-		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty_cycle_mod);
-		__HAL_TIM_SET_AUTORELOAD(&htim2, periodo_mod);
+		__HAL_TIM_SET_AUTORELOAD(&htim2, periodo_mod); 					// Periodo de la señal cuadrada
+		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, duty_cycle_mod);   // Duty cycle de la señal cuadrada
+
+		__HAL_TIM_SET_AUTORELOAD(&htim3, periodo_mod); 					// Periodo del tren de deltas
+		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, periodo_mod/20);	// Duty cycle del tren de deltas (siempre 1/20)
 	}
 }
 
