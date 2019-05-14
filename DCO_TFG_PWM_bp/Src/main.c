@@ -67,6 +67,7 @@
 ADC_HandleTypeDef hadc1;
 ADC_HandleTypeDef hadc2;
 
+TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
@@ -81,7 +82,11 @@ uint8_t mensaje_MIDI[3];
 // Modulacion en DC y freq
 uint8_t nota_actual = 0;
 float intensity_dc = 0;
-float intensity_freq = 50;
+float intensity_freq = 0;
+
+// Resistencias digitales
+uint8_t cuenta = 0;
+int steps = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -94,12 +99,17 @@ static void MX_TIM3_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_ADC2_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 void calculo_notas(void);
 void start_nota(uint8_t nota);
 void stop_nota(void);
 
 uint16_t check_ADC(ADC_HandleTypeDef* hadc);
+
+// Resistencias digitales
+void init_resistencia();
+void resistencia(uint8_t valor);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -142,11 +152,14 @@ int main(void)
   MX_TIM4_Init();
   MX_ADC1_Init();
   MX_ADC2_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   // Calibrado de los ADC
   HAL_ADCEx_Calibration_Start(&hadc1);
   HAL_ADCEx_Calibration_Start(&hadc2);
+
+  init_resistencia();
 
   calculo_notas();
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
@@ -155,14 +168,19 @@ int main(void)
 //   start_nota(i);
 //   HAL_Delay(800);
 //   }
-  start_nota(30);
+//  start_nota(30);
+
+  start_nota(15);
+  HAL_Delay(100);
+  resistencia(100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-//	  start_nota(30);
+
+
 //	  HAL_Delay(1000);
 //	  stop_nota();
 //	  HAL_Delay(1000);
@@ -303,6 +321,52 @@ static void MX_ADC2_Init(void)
   /* USER CODE BEGIN ADC2_Init 2 */
 
   /* USER CODE END ADC2_Init 2 */
+
+}
+
+/**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 31;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 9;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
 
 }
 
@@ -553,7 +617,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(MOSFET_Offset_GPIO_Port, MOSFET_Offset_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOB, INC_Digipot_Pin|MOSFET_Offset_Pin, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(UD_Digipot_GPIO_Port, UD_Digipot_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
@@ -562,12 +629,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : MOSFET_Offset_Pin */
-  GPIO_InitStruct.Pin = MOSFET_Offset_Pin;
+  /*Configure GPIO pins : INC_Digipot_Pin UD_Digipot_Pin MOSFET_Offset_Pin */
+  GPIO_InitStruct.Pin = INC_Digipot_Pin|UD_Digipot_Pin|MOSFET_Offset_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(MOSFET_Offset_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
@@ -604,6 +671,28 @@ void stop_nota(void) {
 	HAL_TIM_Base_Stop_IT(&htim4); // Paramos timer del modulador
 }
 
+void init_resistencia(){
+	steps = 200;
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 0);
+	HAL_TIM_Base_Start_IT(&htim1);
+}
+
+void resistencia(uint8_t valor){
+	static int resist = 0;
+	steps = 2*(valor - resist);
+
+	if (steps < 0){
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 0);
+		steps = -steps;
+	}
+	else {
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 1);
+	}
+	 HAL_TIM_Base_Start_IT(&htim1);
+	 resist = valor;
+
+}
+
 // Atencion a la interrupción de la UART1, cuando se recibe un mensaje MIDI salta la interrupcion
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
@@ -637,6 +726,16 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 		__HAL_TIM_SET_AUTORELOAD(&htim3, periodo_mod); 					// Periodo del tren de deltas
 		__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, periodo_mod/20);	// Duty cycle del tren de deltas (siempre 1/20)
 	}
+
+	if (htim == &htim1){
+			HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+			cuenta++;
+			if (cuenta >= steps){
+				cuenta = 0;
+				HAL_TIM_Base_Stop_IT(&htim1);
+
+			}
+		}
 }
 
 uint16_t check_ADC(ADC_HandleTypeDef* hadc){

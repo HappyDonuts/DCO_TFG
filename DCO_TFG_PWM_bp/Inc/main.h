@@ -82,6 +82,10 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define PWM_Deltas_Pin GPIO_PIN_7
 #define PWM_Deltas_GPIO_Port GPIOA
+#define INC_Digipot_Pin GPIO_PIN_0
+#define INC_Digipot_GPIO_Port GPIOB
+#define UD_Digipot_Pin GPIO_PIN_1
+#define UD_Digipot_GPIO_Port GPIOB
 #define MOSFET_Offset_Pin GPIO_PIN_11
 #define MOSFET_Offset_GPIO_Port GPIOB
 #define PWM_cuadrada_Pin GPIO_PIN_15

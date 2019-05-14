@@ -115,13 +115,22 @@ int main(void)
   /* USER CODE BEGIN 2 */
   init_resistencia();
   HAL_Delay(2000);
-  resistencia(100);
+  resistencia(47);
+//  HAL_Delay(5000);
+//  resistencia(100);
+//  HAL_Delay(5000);
+//  resistencia(20);
+//  HAL_Delay(5000);
+//  resistencia(100);
+//  HAL_GPIO_WritePin(GPIOA,GPIO_PIN_1, 1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+//	  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+//	  HAL_Delay(1);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -221,12 +230,19 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : PA0 PA1 */
   GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
@@ -235,12 +251,19 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : PB0 PB1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
 }
 
 /* USER CODE BEGIN 4 */
 void init_resistencia(){
 	steps = 200;
-	HAL_GPIO_WritePin(GPIOA,GPIO_PIN_1, 0);
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 0);
 	HAL_TIM_Base_Start_IT(&htim2);
 }
 
@@ -249,11 +272,11 @@ void resistencia(uint8_t valor){
 	steps = 2*(valor - resist);
 
 	if (steps < 0){
-		HAL_GPIO_WritePin(GPIOA,GPIO_PIN_1, 0);
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 0);
 		steps = -steps;
 	}
 	else {
-		HAL_GPIO_WritePin(GPIOA,GPIO_PIN_1, 1);
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 1);
 	}
 	 HAL_TIM_Base_Start_IT(&htim2);
 	 resist = valor;
@@ -261,7 +284,7 @@ void resistencia(uint8_t valor){
 }
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2){
-		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_0);
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
 		cuenta++;
 		if (cuenta >= steps){
 			cuenta = 0;
