@@ -43,7 +43,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,7 +53,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define F_CLK 64000000
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -79,7 +79,17 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+static uint16_t timers_notas[89];
+uint8_t mensaje_MIDI[3];
 
+// Modulacion en DC y freq
+uint8_t nota_actual = 0;
+float intensity_dc = 0;
+float intensity_freq = 0;
+
+// Resistencias digitales
+uint8_t cuenta = 0;
+int steps = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -98,7 +108,15 @@ static void MX_TIM16_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
+void calculo_notas(void);
+void start_nota(uint8_t nota);
+void stop_nota(void);
 
+uint16_t check_ADC(ADC_HandleTypeDef* hadc);
+
+// Resistencias digitales
+void init_resistencia();
+void resistencia(uint8_t valor);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -147,7 +165,24 @@ int main(void)
   MX_TIM6_Init();
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
+  //HAL_ADCEx_Calibration_Start(&hadc1);
+  //HAL_ADCEx_Calibration_Start(&hadc2);
 
+  init_resistencia();
+
+  calculo_notas();
+  __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
+
+  //   for(uint8_t i=1; i<89;i++){
+  //   start_nota(i);
+  //   HAL_Delay(800);
+  //   }
+  //  start_nota(30);
+
+//  start_nota(15);
+//  HAL_Delay(100);
+
+//  resistencia(100);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -855,7 +890,111 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void calculo_notas(void){
+	for (uint8_t i=1;i<89;i++){
+		float f_nota = 27.50 * pow(1.059463094, i-1);
+		timers_notas[i] = round(F_CLK/320/f_nota);
+	}
+}
 
+// Crea la PWM correspondiente a la nota
+void start_nota(uint8_t nota){
+	nota_actual = nota;
+
+	HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 0); // Cortamos el MOSFET para que el offset sea Voff, se resta el offset a la salida
+
+	__HAL_TIM_SET_AUTORELOAD(&htim1, timers_notas[nota]-1); // Ajustamos el timer adecuado
+	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, htim1.Init.Period - (timers_notas[nota]-1)/2); //Ajustamos el duty cycle a 1/2, se controlará externamente con un ADC
+	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+
+	__HAL_TIM_SET_AUTORELOAD(&htim15, timers_notas[nota]-1); // Ajustamos el timer adecuado
+	__HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, (timers_notas[nota]-1)/20); //Ajustamos el duty cycle a 1/20 (5%)
+	HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_2);
+
+	HAL_TIM_Base_Start_IT(&htim7); // Arrancamos timer del modulador
+}
+
+void stop_nota(void) {
+	HAL_GPIO_WritePin(GPIOF, GPIO_PIN_1, 1); // Activamos el MOSFET para que el offset sea 0V, la salida sale a 0V
+	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+	HAL_TIM_PWM_Stop(&htim15, TIM_CHANNEL_2);
+	HAL_TIM_Base_Stop_IT(&htim7); // Paramos timer del modulador
+}
+
+void init_resistencia(){
+	steps = 200;
+	HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 0);
+	HAL_TIM_Base_Start_IT(&htim6);
+}
+
+void resistencia(uint8_t valor){
+	static int resist = 0;
+	steps = 2*(valor - resist);
+
+	if (steps < 0){
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 0);
+		steps = -steps;
+	}
+	else {
+		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 1);
+	}
+	 HAL_TIM_Base_Start_IT(&htim6);
+	 resist = valor;
+
+}
+
+// Atencion a la interrupción de la UART1, cuando se recibe un mensaje MIDI salta la interrupcion
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+
+	// Trasmitimos los bytes recibidos por la UART2, por pantalla
+//	for(uint8_t i=0;i<sizeof(mensaje_MIDI);i++){
+//		tx_UART_byte(&huart2, mensaje_MIDI[i], 10);
+//	}
+	// Analizamos el primer byte recibido. Si empieza por 1001, start nota
+	if ((mensaje_MIDI[0]>>4) == 0b1001){
+		uint8_t nota = mensaje_MIDI[1]-20; // Obtenemos la nota MIDI, le restamos 20 para que coincida con nuestro teclado
+		start_nota(nota);
+	}
+	else {	// Si no empieza por 1001, es un stop nota
+		stop_nota();
+	}
+	__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE); // Volvemos a activar las interrupciones de la UART1
+
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+	if(htim==&htim7){
+
+		float data_adc_dc = check_ADC(&hadc1);
+		float data_adc_freq = check_ADC(&hadc2);
+		float periodo_mod = (timers_notas[nota_actual]-1)*(1 - (intensity_freq/500)*(data_adc_freq-2048)/2048);
+		float duty_cycle_mod = periodo_mod*(0.5 + (intensity_dc/100)*(data_adc_dc-2048)/4095);
+
+		__HAL_TIM_SET_AUTORELOAD(&htim1, periodo_mod); 					// Periodo de la señal cuadrada
+		__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, duty_cycle_mod);   // Duty cycle de la señal cuadrada
+
+		__HAL_TIM_SET_AUTORELOAD(&htim15, periodo_mod); 					// Periodo del tren de deltas
+		__HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, periodo_mod/20);	// Duty cycle del tren de deltas (siempre 1/20)
+	}
+
+	if (htim == &htim6){
+			HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_0);
+			cuenta++;
+			if (cuenta >= steps){
+				cuenta = 0;
+				HAL_TIM_Base_Stop_IT(&htim6);
+
+			}
+		}
+}
+
+uint16_t check_ADC(ADC_HandleTypeDef* hadc){
+	HAL_ADC_Start(hadc);
+	HAL_ADC_PollForConversion(hadc, 1000);
+	uint16_t data_adc = HAL_ADC_GetValue(hadc);
+	HAL_ADC_Stop(hadc);
+	return data_adc;
+}
 /* USER CODE END 4 */
 
 /**
