@@ -44,6 +44,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "math.h"
+#include "print_UART.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -80,6 +81,8 @@ UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 static uint16_t timers_notas[89];
+static uint8_t resistencias_notas[89];
+
 uint8_t mensaje_MIDI[3];
 
 // Modulacion en DC y freq
@@ -90,6 +93,7 @@ float intensity_freq = 0;
 // Resistencias digitales
 uint8_t cuenta = 0;
 int steps = 0;
+uint8_t done_res = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,6 +113,7 @@ static void MX_TIM6_Init(void);
 static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 void calculo_notas(void);
+void calculo_resistencias(void);
 void start_nota(uint8_t nota);
 void stop_nota(void);
 
@@ -171,6 +176,7 @@ int main(void)
   init_resistencia();
 
   calculo_notas();
+  calculo_resistencias();
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
 
   //   for(uint8_t i=1; i<89;i++){
@@ -179,16 +185,27 @@ int main(void)
   //   }
   //  start_nota(30);
 
-//  start_nota(15);
-//  HAL_Delay(100);
 
-//  resistencia(100);
+//	start_nota(30);
+
+
+
+//  resistencia(19);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  start_nota(1);
+	  HAL_Delay(2000);
+	  stop_nota();
+	  HAL_Delay(500);
+
+	  start_nota(10);
+	  HAL_Delay(2000);
+	  stop_nota();
+	  HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -897,6 +914,19 @@ void calculo_notas(void){
 	}
 }
 
+void calculo_resistencias(void){
+	for (uint8_t i=0;i<6;i++){
+		resistencias_notas[i] = 100;
+	}
+
+	for (uint8_t i=6; i<89;i++){
+		double arg1 = 6-i;
+		double arg2 = arg1/17;
+		double d_resist = 100*exp(arg2);
+		resistencias_notas[i] = round(d_resist);
+	}
+}
+
 // Crea la PWM correspondiente a la nota
 void start_nota(uint8_t nota){
 	nota_actual = nota;
@@ -906,6 +936,7 @@ void start_nota(uint8_t nota){
 	__HAL_TIM_SET_AUTORELOAD(&htim1, timers_notas[nota]-1); // Ajustamos el timer adecuado
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, htim1.Init.Period - (timers_notas[nota]-1)/2); //Ajustamos el duty cycle a 1/2, se controlará externamente con un ADC
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+	resistencia(resistencias_notas[nota]);
 
 	__HAL_TIM_SET_AUTORELOAD(&htim15, timers_notas[nota]-1); // Ajustamos el timer adecuado
 	__HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, (timers_notas[nota]-1)/20); //Ajustamos el duty cycle a 1/20 (5%)
@@ -919,6 +950,7 @@ void stop_nota(void) {
 	HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Stop(&htim15, TIM_CHANNEL_2);
 	HAL_TIM_Base_Stop_IT(&htim7); // Paramos timer del modulador
+
 }
 
 void init_resistencia(){
@@ -938,8 +970,13 @@ void resistencia(uint8_t valor){
 	else {
 		HAL_GPIO_WritePin(GPIOB,GPIO_PIN_1, 1);
 	}
-	 HAL_TIM_Base_Start_IT(&htim6);
-	 resist = valor;
+	done_res = 0;	// Se pone el flag a 0
+	HAL_TIM_Base_Start_IT(&htim6);
+
+	resist = valor;
+//	while (done_res == 0){ // Cuando done es 1, la resistencia está lista y podemos salir
+//		HAL_Delay(1);	// Sin este delay se atora
+//	}
 
 }
 
@@ -982,6 +1019,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 			cuenta++;
 			if (cuenta >= steps){
 				cuenta = 0;
+				done_res = 1; // Done a 1 indica que la R esta lista
 				HAL_TIM_Base_Stop_IT(&htim6);
 
 			}
