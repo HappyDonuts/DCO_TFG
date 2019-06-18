@@ -838,6 +838,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	if (huart == &huart1){
 		if ((mensaje_MIDI[0]>>4) == 0b1001){
 			uint8_t nota = mensaje_MIDI[1]-20; // Obtenemos la nota MIDI, le restamos 20 para que coincida con nuestro teclado
+			tx_UART_byte(&huart2, mensaje_MIDI[2], 10);
 			start_nota(nota);
 		}
 		else {	// Si no empieza por 1001, es un stop nota
