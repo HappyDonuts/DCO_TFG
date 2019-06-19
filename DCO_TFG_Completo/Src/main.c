@@ -171,33 +171,23 @@ int main(void)
   __HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE);
   __HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE);
 
-  //   for(uint8_t i=1; i<89;i++){
-  //   start_nota(i);
-  //   HAL_Delay(800);
-  //   }
-  //  start_nota(30);
+ //	start_nota(30);
 
-
-//	start_nota(30);
-
-
-
-//  resistencia(19);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  start_nota(30);
-	  HAL_Delay(2000);
-	  stop_nota();
-	  HAL_Delay(500);
-
-	  start_nota(40);
-	  HAL_Delay(2000);
-	  stop_nota();
-	  HAL_Delay(500);
+//	  start_nota(30);
+//	  HAL_Delay(2000);
+//	  stop_nota();
+//	  HAL_Delay(500);
+//
+//	  start_nota(40);
+//	  HAL_Delay(2000);
+//	  stop_nota();
+//	  HAL_Delay(500);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -785,6 +775,7 @@ void start_nota(uint8_t nota){
 	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 	resistencia(resistencias_notas[nota]);
 
+	HAL_TIM_PWM_Stop(&htim15, TIM_CHANNEL_2);
 	__HAL_TIM_SET_AUTORELOAD(&htim15, timers_notas[nota]-1); // Ajustamos el timer adecuado
 	__HAL_TIM_SET_COMPARE(&htim15, TIM_CHANNEL_2, (timers_notas[nota]-1)/20); //Ajustamos el duty cycle a 1/20 (5%)
 	HAL_TIM_PWM_Start(&htim15, TIM_CHANNEL_2);
@@ -836,13 +827,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 //	}
 	// Analizamos el primer byte recibido. Si empieza por 1001, start nota
 	if (huart == &huart1){
+		uint8_t nota = mensaje_MIDI[1]-20; // Obtenemos la nota MIDI, le restamos 20 para que coincida con nuestro teclado
+		static uint8_t nota_actual;
 		if ((mensaje_MIDI[0]>>4) == 0b1001){
-			uint8_t nota = mensaje_MIDI[1]-20; // Obtenemos la nota MIDI, le restamos 20 para que coincida con nuestro teclado
-			tx_UART_byte(&huart2, mensaje_MIDI[2], 10);
+			nota_actual = nota;
+//			tx_UART_byte(&huart2, mensaje_MIDI[2], 10);
 			start_nota(nota);
 		}
 		else {	// Si no empieza por 1001, es un stop nota
+			if (nota_actual == nota) {	// Se suelta otra tecla que no es la que está sonando no se para
 			stop_nota();
+			}
 		}
 		__HAL_UART_ENABLE_IT(&huart1, UART_IT_RXNE); // Volvemos a activar las interrupciones de la UART1
 	}
